@@ -1,0 +1,169 @@
+import gradio as gr
+import requests
+import asyncio
+import time
+import sys
+import os
+
+# 添加后端目录到系统路径
+sys.path.append(os.path.join(os.path.dirname(__file__), '../backend'))
+from teststoryvideo import StoryVideoClient
+
+def create_interface():
+    with gr.Blocks() as interface:
+        gr.Markdown("# 儿童故事绘本生成器")
+        
+        with gr.Row():
+            with gr.Column():
+                text_llm_provider = gr.Dropdown(
+                    label="文本 LLM 提供商",
+                    choices=["OpenAI", "智谱AI", "百度文心", "讯飞星火"],
+                    value="OpenAI"
+                )
+                image_llm_provider = gr.Dropdown(
+                    label="图像 LLM 提供商",
+                    choices=["Stable Diffusion", "DALL-E", "Midjourney"],
+                    value="DALL-E"
+                )
+                text_llm_model = gr.Textbox(
+                    label="文本 LLM 模型",
+                    placeholder="gpt-4o 或 qwen-plus 或其他",
+                    value="gpt-4"
+                )
+                image_llm_model = gr.Textbox(
+                    label="图像 LLM 模型",
+                    placeholder="dall-e-3 或 flux-dev 或其他",
+                    value="dall-e-3"
+                )
+                image_resolution = gr.Dropdown(
+                    label="图像分辨率",
+                    choices=[
+                        "1024*1024",
+                        "512*512",
+                        "1024*768",
+                        "1024*682",
+                        "1024*576",
+                        "768*1024",
+                        "682*1024",
+                        "576*1024"
+                    ],
+                    value="1024*1024"
+                )
+                video_language = gr.Dropdown(
+                    label="视频语言",
+                    choices=["中文", "英文", "日语", "韩语"],
+                    value="中文"
+                )
+                voice_name = gr.Dropdown(
+                    label="语音名称",
+                    choices=[
+                        "zh-CN-XiaoxiaoNeural",
+                        "zh-CN-XiaoyiNeural", 
+                        "zh-CN-YunjianNeural",
+                        "zh-CN-YunxiNeural",
+                        "zh-CN-YunxiaNeural",
+                        "zh-CN-YunyangNeural",
+                        "es-US-AlonsoNeural",
+                        "es-US-PalomaNeural",
+                        "zh-HK-HiuGaaiNeural",
+                        "zh-HK-WanLungNeural",
+                        "zh-TW-HsiaoChenNeural",
+                        "zh-TW-YunJheNeural",
+                        "zu-ZA-ThandoNeural",
+                        "zu-ZA-ThembaNeural",
+                        "ja-JP-KeitaNeural",
+                        "ja-JP-NanamiNeural"
+                    ],
+                    value="zh-CN-XiaoxiaoNeural"
+                )
+                story_theme = gr.Textbox(
+                    label="故事主题",
+                    placeholder="请输入故事主题",
+                    lines=3
+                )
+                story_sections = gr.Number(
+                    label="故事分段，1-10",
+                    value=3,
+                    minimum=1,
+                    maximum=10,
+                    step=1
+                )
+                generate_btn = gr.Button("生成故事")
+
+            with gr.Column():
+                story_output = gr.Textbox(label="生成的故事", lines=10)
+                image_output = gr.Image(label="故事配图")
+                status_output = gr.Textbox(label="状态信息", visible=False)
+        
+        async def generate_story(text_provider, image_provider, text_model, image_model, 
+                         resolution, video_lang, voice, theme, sections):
+            # 创建进度信息
+            progress_info = gr.update(value="正在生成故事，请稍候...", visible=True)
+            
+            # 语言映射
+            language_map = {
+                "中文": "zh-CN",
+                "英文": "en-US",
+                "日语": "ja-JP",
+                "韩语": "ko-KR"
+            }
+            
+            # 创建客户端
+            client = StoryVideoClient()
+            
+            try:
+                # 调用后端API
+                result = await client.generate_video(
+                    story_prompt=theme,
+                    segments=int(sections),
+                    language=language_map.get(video_lang, "zh-CN"),
+                    voice_name=voice,
+                    voice_rate=1.0,
+                    resolution=resolution,
+                    text_llm_provider=text_provider,
+                    image_llm_provider=image_provider,
+                    text_llm_model=text_model,
+                    image_llm_model=image_model
+                )
+                
+                if result["success"]:
+                    # 获取视频URL和故事文本
+                    video_url = result["data"]["video_url"]
+                    story_text = result["data"].get("story_text", "故事生成成功，但无法获取文本内容")
+                    
+                    # 如果有图片，获取第一张图片作为预览
+                    image_url = None
+                    if "images" in result["data"] and len(result["data"]["images"]) > 0:
+                        image_url = result["data"]["images"][0]
+                    
+                    return story_text, image_url, gr.update(value=f"故事生成成功! 视频地址: {video_url}", visible=True)
+                else:
+                    error_msg = result.get("message", "未知错误")
+                    return f"故事生成失败: {error_msg}", None, gr.update(value=f"生成失败: {error_msg}", visible=True)
+            except Exception as e:
+                return f"发生错误: {str(e)}", None, gr.update(value=f"发生错误: {str(e)}", visible=True)
+        
+        generate_btn.click(
+            fn=generate_story,
+            inputs=[
+                text_llm_provider,
+                image_llm_provider,
+                text_llm_model,
+                image_llm_model,
+                image_resolution,
+                video_language,
+                voice_name,
+                story_theme,
+                story_sections
+            ],
+            outputs=[story_output, image_output, status_output]
+        )
+    
+    return interface
+
+if __name__ == "__main__":
+    interface = create_interface()
+    interface.queue().launch()
+    
+    # 注意：由于使用了异步函数，需要确保Gradio支持异步操作
+    # 最新版本的Gradio已经支持异步函数
