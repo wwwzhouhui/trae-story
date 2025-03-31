@@ -113,6 +113,7 @@ async def create_video_with_scenes(task_dir: str, scenes: List[StoryScene], voic
         test_mode (bool): 是否为测试模式，如果是则使用已有的图片、音频、字幕文件
     """
     clips = []
+    video_url=""
     for i, scene in enumerate(scenes, 1):
         try:
             # 获取文件路径
@@ -231,45 +232,45 @@ async def create_video_with_scenes(task_dir: str, scenes: List[StoryScene], voic
     logger.info(f"Writing video to {video_file}")
     final_clip.write_videofile(video_file, fps=24, codec='libx264', audio_codec='aac')
     
-    # # 上传视频到腾讯云COS
-    # logger.info("Uploading video to Tencent COS")
-    # try:
-    #     # if not all([cos_config["region"], cos_config["secret_id"], cos_config["secret_key"], cos_config["bucket"]]):
-    #     #     logger.error("Missing required COS configuration")
-    #     #     return None
+    # 上传视频到腾讯云COS
+    logger.info("Uploading video to Tencent COS")
+    try:
+        # if not all([cos_config["region"], cos_config["secret_id"], cos_config["secret_key"], cos_config["bucket"]]):
+        #     logger.error("Missing required COS configuration")
+        #     return None
 
             
-    #     config = CosConfig(
-    #         Region=region,
-    #         SecretId=secret_id,
-    #         SecretKey=secret_key
-    #     )
-    #     client = CosS3Client(config)
+        config = CosConfig(
+            Region=region,
+            SecretId=secret_id,
+            SecretKey=secret_key
+        )
+        client = CosS3Client(config)
         
-    #     # 获取视频文件名
-    #     video_filename = os.path.basename(video_file)
+        # 获取视频文件名
+        video_filename = os.path.basename(video_file)
         
-    #     # 上传文件
-    #     response = client.upload_file(
-    #         Bucket=bucket,
-    #         LocalFilePath=video_file,
-    #         Key=f"videos/{video_filename}",  # 添加 videos/ 前缀
-    #         PartSize=10,
-    #         MAXThread=10,
-    #         EnableMD5=False
-    #     )
+        # 上传文件
+        response = client.upload_file(
+            Bucket=bucket,
+            LocalFilePath=video_file,
+            Key=f"videos/{video_filename}",  # 添加 videos/ 前缀
+            PartSize=10,
+            MAXThread=10,
+            EnableMD5=False
+        )
         
-    #     if response.get('ETag'):
-    #         video_url = f"https://{bucket}.cos.{region}.myqcloud.com/videos/{video_filename}"
-    #         logger.info(f"Video uploaded successfully: {video_url}")
-    #         return video_url
-    #     else:
-    #         logger.error("Failed to upload video to COS: No ETag in response")
-    #         return None
-    # except Exception as e:
-    #     logger.error(f"Error uploading video to COS: {str(e)}")
-    #     return None
-    return video_file
+        if response.get('ETag'):
+            video_url = f"https://{bucket}.cos.{region}.myqcloud.com/videos/{video_filename}"
+            logger.info(f"Video uploaded successfully: {video_url}")
+            #return video_url
+        else:
+            logger.error("Failed to upload video to COS: No ETag in response")
+            return None
+    except Exception as e:
+        logger.error(f"Error uploading video to COS: {str(e)}")
+        return None
+    return video_file,video_url
 
 
 async def generate_video(request: VideoGenerateRequest):

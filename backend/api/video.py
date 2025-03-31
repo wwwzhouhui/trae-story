@@ -57,8 +57,8 @@ async def generate_video_endpoint(
 ):
     """生成视频"""
     try:
-        #video_file = await generate_video(request)
-        video_file = "f:/work/code/AIcode/story/src/backend/tasks/1742821862/video20250324211114.mp4"
+        video_file,video_cos_url = await generate_video(request)
+        #video_file = "f:/work/code/AIcode/story/src/backend/tasks/1742821862/video20250324211114.mp4"
         logger.info(f"Video generated successfully: {video_file}")
         task_id = extract_id(video_file)
         video_filename = os.path.basename(video_file)
@@ -78,8 +78,10 @@ async def generate_video_endpoint(
         scheme = req.headers.get("x-forwarded-proto", "http")
         base_url = f"{scheme}://{host}"
         video_url = f"{base_url}/tasks/{task_id}/{video_filename}"
-        
+        if video_cos_url:
+            video_url = video_cos_url
         logger.info(f"Video URL: {video_url}")
+        
         logger.info(f"Story Text: {story_text}")
         logger.info(f"Images: {images}")
         return VideoGenerateResponse(
