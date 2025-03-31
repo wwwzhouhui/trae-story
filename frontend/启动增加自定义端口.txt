@@ -1,0 +1,1 @@
+nohup streamlit run appstreamlit.py --server.port 8003 > appstreamlit.log &

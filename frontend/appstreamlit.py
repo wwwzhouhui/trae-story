@@ -6,7 +6,7 @@ import time
 from typing import Optional, Dict, Any
 
 class StoryVideoClient:
-    def __init__(self, base_url: str = "http://127.0.0.1:8085", api_token: str = None):
+    def __init__(self, base_url: str = "http://127.0.0.1:8001", api_token: str = None):
         self.base_url = base_url.rstrip('/')
         self.api_token = "zhouhui-1258720957"
 
@@ -65,7 +65,20 @@ class StoryVideoClient:
             st.error(f"请求失败，总耗时: {elapsed_time:.2f} 秒")
             raise Exception(f"Failed to generate video: {str(e)}")
 
+def display_output():
+    with st.container():
+        if st.session_state.image_url:
+            st.image(st.session_state.image_url, caption="故事配图")
+            
+        if st.session_state.video_url:
+            st.video(st.session_state.video_url)
+        st.text_area("生成的故事", value=st.session_state.story_text, height=200)
+
 def main():
+    # 在文件开头添加新的状态变量
+    if "need_update" not in st.session_state:
+        st.session_state.need_update = False
+
     st.set_page_config(page_title="儿童故事绘本生成器", layout="wide")
     st.title("儿童故事绘本生成器")
 
@@ -150,19 +163,9 @@ def main():
         if "story_text" not in st.session_state:
             st.session_state.story_text = ""
 
-        # 显示输出区域
-        output_container = st.container()
-        with output_container:
-            
-            if st.session_state.image_url:
-                st.image(st.session_state.image_url, caption="故事配图")
-                
-            if st.session_state.video_url:
-                st.video(st.session_state.video_url)
-            st.text_area("生成的故事", value=st.session_state.story_text, height=200)
+        # 初始显示输出区域
+        display_output()
 
-    # 生成按钮放在左侧列底部
-    
     with col1:
         if st.button("生成故事"):
             language_map = {
@@ -192,6 +195,7 @@ def main():
                         image_llm_model=image_llm_model
                     ))
                     
+                    # 修改结果处理部分
                     if result["success"]:
                         st.session_state.video_url = result["data"]["video_url"]
                         st.session_state.story_text = result["data"].get("story_text", "故事生成成功，但无法获取文本内容")
@@ -199,8 +203,11 @@ def main():
                         if "images" in result["data"] and len(result["data"]["images"]) > 0:
                             st.session_state.image_url = result["data"]["images"][0]
                         
+                        # 生成成功后立即更新显示
+                        with col2:
+                            display_output()
                         st.success("故事生成成功！")
-                        # 删除重复显示的内容部分
+                        # 删除 st.rerun() 这一行
                     else:
                         st.error(f"故事生成失败: {result.get('message', '未知错误')}")
             except Exception as e:
